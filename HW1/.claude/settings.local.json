@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./Exercise1-1.exe)",
+      "Bash(gcc:*)",
+      "Bash(./Exercise1-5-1.exe)",
+      "Bash(dune build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

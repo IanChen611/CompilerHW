@@ -1,0 +1,18 @@
+# C:\Users\ianch\AppData\Local\opam\default\bin\dune.exe exec ./minipython.exe test.py
+# OCAMLPARAM: unset
+# Shared cache: enabled-except-user-rules
+# Shared cache location:
+# C:\Users\ianch\AppData\Local\Microsoft\Windows\INetCache\dune\db
+# Workspace root:
+# "D:\\\229\140\151\231\167\145\229\164\167\\114-1\231\183\168\232\173\175\229\153\168\229\142\159\231\144\134\\HW2\\mini-python"
+# Auto-detected concurrency: 16
+# Dune context:
+#  { name = "default"
+#  ; kind = "default"
+#  ; profile = Dev
+#  ; merlin = true
+#  ; fdo_target_exe = None
+#  ; build_dir = In_build_dir "default"
+#  ; instrument_with = []
+#  }
+$ C:\Users\ianch\AppData\Local\opam\default\bin\ocamlc.opt.exe -config > C:\Users\ianch\AppData\Local\Temp\dune_7c0986_output
