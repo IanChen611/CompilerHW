@@ -48,7 +48,7 @@ let rec print_value = function
   第二題需要實作的內容
 
   1. is_false 和 is_true 函數：判斷一個值的真假
-  2. 比較運算子：==, !=, <, <=, >, >=
+  2. 比較運算子：==, !=(<>), <, <=, >, >=
   3. 布林常數：True, False
   4. 布林運算子：and, or, not
   5. if 語句：條件判斷
@@ -110,7 +110,7 @@ let rec expr (ctx: ctx) = function
         | Bgt, _, _  -> Vbool (v1 > v2)
         | Bge, _, _  -> Vbool (v1 >= v2)
         | Badd, Vstring s1, Vstring s2 ->
-            assert false (* to be completed (question 3) *)
+            Vstring (s1 ^ s2)
         | Badd, Vlist l1, Vlist l2 ->
             assert false (* to be completed (question 5) *)
         | _ -> error "unsupported operand types"
@@ -133,7 +133,8 @@ let rec expr (ctx: ctx) = function
       let v1 = expr ctx e1 in
       Vbool (is_false v1)
   | Eident id ->
-      assert false (* to be completed (question 3) *)
+      (try Hashtbl.find ctx id.id
+       with Not_found -> error ("unbound variable " ^ id.id))
   (* function call *)
   | Ecall ({id="len"; _}, [e1]) ->
       assert false (* to be completed (question 5) *)
@@ -159,7 +160,8 @@ and stmt (ctx: ctx) = function
       let v = expr ctx e in
       if is_true v then stmt ctx s1 else stmt ctx s2
   | Sassign (id, e1) ->
-      assert false (* to be completed (question 3) *)
+      let v1 = expr ctx e1 in
+      Hashtbl.replace ctx id.id v1
   | Sreturn e ->
       assert false (* to be completed (question 4) *)
   | Sfor (x, e, s) ->

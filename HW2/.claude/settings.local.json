@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wsl:*)",
+      "Bash(dune build:*)",
+      "Bash(./minipython.exe test.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
