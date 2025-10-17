@@ -4,7 +4,14 @@
       "Bash(./Exercise1-1.exe)",
       "Bash(gcc:*)",
       "Bash(./Exercise1-5-1.exe)",
-      "Bash(dune build:*)"
+      "Bash(dune build:*)",
+      "Bash(./Exercise1-2.exe)",
+      "Bash(./Exercise1-3.exe)",
+      "Bash(./Exercise1-4.exe)",
+      "Bash(./Exercise1-5-2.exe)",
+      "Bash(cat:*)",
+      "Bash(./arithc.exe:*)",
+      "Bash(./test.out)"
     ],
     "deny": [],
     "ask": []

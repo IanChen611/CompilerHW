@@ -3,7 +3,14 @@
     "allow": [
       "Bash(wsl:*)",
       "Bash(dune build:*)",
-      "Bash(./minipython.exe test.py)"
+      "Bash(./minipython.exe test.py)",
+      "Bash(bash run-tests:*)",
+      "Bash(make)",
+      "Bash(ocamlopt:*)",
+      "Bash(cat:*)",
+      "Bash(ocamlc:*)",
+      "Bash(./test_compare)",
+      "Bash(ocaml:*)"
     ],
     "deny": [],
     "ask": []

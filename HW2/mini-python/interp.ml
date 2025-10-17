@@ -64,6 +64,45 @@ let is_false (v: value) =
 
 let is_true (v: value) = not (is_false v)
 
+(* Bonus: Structural comparison compatible with Python
+
+   Python uses lexicographic order for lists, while OCaml compares
+   lengths first. This function implements Python-compatible comparison.
+
+   Returns:
+   - negative integer if v1 < v2
+   - zero if v1 = v2
+   - positive integer if v1 > v2
+*)
+let rec compare_value v1 v2 =
+  match v1, v2 with
+  | Vnone, Vnone -> 0
+  | Vnone, _ -> -1
+  | _, Vnone -> 1
+  | Vbool b1, Vbool b2 -> compare b1 b2
+  | Vbool _, _ -> -1
+  | _, Vbool _ -> 1
+  | Vint n1, Vint n2 -> compare n1 n2
+  | Vint _, _ -> -1
+  | _, Vint _ -> 1
+  | Vstring s1, Vstring s2 -> String.compare s1 s2
+  | Vstring _, _ -> -1
+  | _, Vstring _ -> 1
+  | Vlist a1, Vlist a2 ->
+      (* Lexicographic comparison for lists *)
+      let len1 = Array.length a1 in
+      let len2 = Array.length a2 in
+      let rec compare_elements i =
+        if i >= len1 && i >= len2 then 0
+        else if i >= len1 then -1  (* a1 is shorter *)
+        else if i >= len2 then 1   (* a2 is shorter *)
+        else
+          let cmp = compare_value a1.(i) a2.(i) in
+          if cmp <> 0 then cmp
+          else compare_elements (i + 1)
+      in
+      compare_elements 0
+
 (* We only have global functions in Mini-Python *)
 
 let functions = (Hashtbl.create 16 : (string, ident list * stmt) Hashtbl.t)
@@ -103,16 +142,16 @@ let rec expr (ctx: ctx) = function
         | Bmod, Vint n1, Vint n2 ->
             if n2 = 0 then error "modulo by zero"
             else Vint (n1 mod n2)
-        | Beq, _, _  -> Vbool (v1 = v2)
-        | Bneq, _, _ -> Vbool (v1 <> v2)
-        | Blt, _, _  -> Vbool (v1 < v2)
-        | Ble, _, _  -> Vbool (v1 <= v2)
-        | Bgt, _, _  -> Vbool (v1 > v2)
-        | Bge, _, _  -> Vbool (v1 >= v2)
+        | Beq, _, _  -> Vbool (compare_value v1 v2 = 0)
+        | Bneq, _, _ -> Vbool (compare_value v1 v2 <> 0)
+        | Blt, _, _  -> Vbool (compare_value v1 v2 < 0)
+        | Ble, _, _  -> Vbool (compare_value v1 v2 <= 0)
+        | Bgt, _, _  -> Vbool (compare_value v1 v2 > 0)
+        | Bge, _, _  -> Vbool (compare_value v1 v2 >= 0)
         | Badd, Vstring s1, Vstring s2 ->
             Vstring (s1 ^ s2)
         | Badd, Vlist l1, Vlist l2 ->
-            assert false (* to be completed (question 5) *)
+            Vlist (Array.append l1 l2)
         | _ -> error "unsupported operand types"
       end
   | Eunop (Uneg, e1) ->
@@ -137,15 +176,63 @@ let rec expr (ctx: ctx) = function
        with Not_found -> error ("unbound variable " ^ id.id))
   (* function call *)
   | Ecall ({id="len"; _}, [e1]) ->
-      assert false (* to be completed (question 5) *)
+      begin match expr ctx e1 with
+        | Vlist arr -> Vint (Array.length arr)
+        | _ -> error "len() requires a list"
+      end
   | Ecall ({id="list"; _}, [Ecall ({id="range"; _}, [e1])]) ->
-      assert false (* to be completed (question 5) *)
+      begin match expr ctx e1 with
+        | Vint n when n >= 0 ->
+            Vlist (Array.init n (fun i -> Vint i))
+        | Vint n ->
+            error ("range() argument must be non-negative, got " ^ string_of_int n)
+        | _ ->
+            error "range() argument must be an integer"
+      end
   | Ecall (f, el) ->
-      assert false (* to be completed (question 4) *)
+      (* 找到函數定義 *)
+      let (params, body) =
+        try Hashtbl.find functions f.id
+        with Not_found -> error ("undefined function " ^ f.id)
+      in
+      (* 檢查參數數量 *)
+      if List.length params <> List.length el then
+        error ("function " ^ f.id ^ " expects " ^
+               string_of_int (List.length params) ^ " arguments")
+      else begin
+        (* 計算所有實際參數的值 *)
+        let args = List.map (expr ctx) el in
+        (* 建立新的環境 *)
+        let local_ctx = Hashtbl.create 16 in
+        (* 將形式參數綁定到實際參數的值 *)
+        List.iter2 (fun param arg ->
+          Hashtbl.add local_ctx param.id arg
+        ) params args;
+        (* 執行函數主體，捕捉 Return exception *)
+        try
+          stmt local_ctx body;
+          Vnone  (* 如果沒有 return，返回 None *)
+        with Return v -> v
+      end
   | Elist el ->
-      assert false (* to be completed (question 5) *)
+      (* 計算所有元素的值並建立陣列 *)
+      let values = List.map (expr ctx) el in
+      Vlist (Array.of_list values)
   | Eget (e1, e2) ->
-      assert false (* to be completed (question 5) *)
+      (* 存取串列元素 e1[e2] *)
+      let v1 = expr ctx e1 in
+      let v2 = expr ctx e2 in
+      begin match v1, v2 with
+        | Vlist arr, Vint i ->
+            if i >= 0 && i < Array.length arr then
+              arr.(i)
+            else
+              error ("list index out of range: " ^ string_of_int i)
+        | Vlist _, _ ->
+            error "list index must be an integer"
+        | _ ->
+            error "indexing requires a list"
+      end
 
 (* Interpreting a statement (does not return anything but may raise exception `Return`) *)
 
@@ -163,11 +250,37 @@ and stmt (ctx: ctx) = function
       let v1 = expr ctx e1 in
       Hashtbl.replace ctx id.id v1
   | Sreturn e ->
-      assert false (* to be completed (question 4) *)
+      let v = expr ctx e in
+      raise (Return v)
   | Sfor (x, e, s) ->
-      assert false (* to be completed (question 5) *)
+      (* for 迴圈：依序將串列 e 的每個值賦給變數 x，並執行語句 s *)
+      (* 重要：表達式 e 只能計算一次 *)
+      let list_val = expr ctx e in
+      begin match list_val with
+        | Vlist arr ->
+            Array.iter (fun v ->
+              Hashtbl.replace ctx x.id v;
+              stmt ctx s
+            ) arr
+        | _ ->
+            error "for loop requires a list"
+      end
   | Sset (e1, e2, e3) ->
-      assert false (* to be completed (question 5) *)
+      (* 串列元素賦值：e1[e2] = e3 *)
+      let v1 = expr ctx e1 in
+      let v2 = expr ctx e2 in
+      let v3 = expr ctx e3 in
+      begin match v1, v2 with
+        | Vlist arr, Vint i ->
+            if i >= 0 && i < Array.length arr then
+              arr.(i) <- v3
+            else
+              error ("list assignment index out of range: " ^ string_of_int i)
+        | Vlist _, _ ->
+            error "list index must be an integer"
+        | _ ->
+            error "list assignment requires a list"
+      end
 
 (* Interpreting a block i.e. a sequence of statements *)
 
@@ -181,7 +294,9 @@ and block (ctx: ctx) = function
  *)
 
 let file ((dl: def list), (s: stmt)) =
-  (* to be completed (question 4) *)
+  List.iter (fun (fname, params, body) ->
+    Hashtbl.add functions fname.id (params, body)
+  ) dl;
   stmt (Hashtbl.create 16) s
 
 

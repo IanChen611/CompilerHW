@@ -1,0 +1,125 @@
+# Mini-Python 測試指南
+
+## 環境需求
+- OCaml 編譯器（dune 構建系統）
+
+## 測試方法
+
+### 手動測試單一檔案
+
+```bash
+cd mini-python
+dune build minipython.exe
+dune exec ./minipython.exe test.py
+```
+
+或測試其他檔案：
+
+```bash
+dune exec ./minipython.exe tests/good/arith1.py
+dune exec ./minipython.exe tests/good/print_int.py
+```
+
+## 測試檔案說明
+
+### test.py 內容
+```python
+print(1+2*3)           # 應輸出: 7
+print((3*3 +4*4)//5)   # 應輸出: 5
+print(10-3-4)          # 應輸出: 3
+```
+
+### 相關測試檔案位置
+
+**第一題（算術運算）相關測試：**
+- `tests/good/arith1.py` → `arith1.out`
+- `tests/good/arith2.py` → `arith2.out`
+- `tests/good/arith3.py` → `arith3.out`
+- `tests/good/arith4.py` → `arith4.out`
+- `tests/good/print_int.py` → `print_int.out`
+
+每個 `.py` 檔案都有對應的 `.out` 檔案，包含預期輸出。
+
+## 測試流程範例
+
+### 1. 編譯程式
+```bash
+cd mini-python
+dune build minipython.exe
+```
+
+如果編譯成功，不會有錯誤訊息。
+
+### 2. 測試基本功能
+```bash
+dune exec ./minipython.exe test.py
+```
+
+預期輸出：
+```
+7
+5
+3
+```
+
+### 3. 測試特定檔案
+```bash
+dune exec ./minipython.exe tests/good/arith1.py
+```
+
+預期輸出：
+```
+3
+```
+
+### 4. 比對輸出
+```bash
+dune exec ./minipython.exe tests/good/arith1.py > output.txt
+diff output.txt tests/good/arith1.out
+```
+
+如果沒有輸出，表示結果正確。
+
+## 除錯技巧
+
+### 如果編譯失敗
+- 檢查 `interp.ml` 的語法錯誤
+- 確認所有 `assert false` 都已實作
+
+### 如果執行時錯誤
+- 查看錯誤訊息
+- 使用簡單的測試檔案逐步測試
+- 檢查 pattern matching 是否完整
+
+### 常見錯誤
+1. `Match_failure` - pattern matching 不完整
+2. `Assert_failure` - 還有未實作的 `assert false`
+3. `Error "..."` - 運行時錯誤（如除以零）
+
+## 逐題測試建議
+
+### 第一題（算術運算）
+測試檔案：
+```bash
+dune exec ./minipython.exe tests/good/print_int.py
+dune exec ./minipython.exe tests/good/arith1.py
+dune exec ./minipython.exe tests/good/arith2.py
+dune exec ./minipython.exe tests/good/arith3.py
+dune exec ./minipython.exe tests/good/arith4.py
+```
+
+### 第二題（布林運算）
+測試檔案：
+```bash
+dune exec ./minipython.exe tests/good/bool1.py
+dune exec ./minipython.exe tests/good/bool2.py
+# ... 等等
+```
+
+### 第三題（變數與字串）
+測試檔案：
+```bash
+dune exec ./minipython.exe tests/good/var1.py
+dune exec ./minipython.exe tests/good/str1.py
+# ... 等等
+```

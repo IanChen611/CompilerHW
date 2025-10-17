@@ -1,9 +1,11 @@
-# dune exec ./minipython.exe test.py
+# C:\Users\ianch\AppData\Local\opam\default\bin\dune.exe exec ./minipython.exe tests/bad/range2.py
 # OCAMLPARAM: unset
 # Shared cache: enabled-except-user-rules
-# Shared cache location: /home/ian/.cache/dune/db
-# Workspace root: /mnt/f/CompilerHW/HW2/mini-python
-# Auto-detected concurrency: 8
+# Shared cache location:
+# C:\Users\ianch\AppData\Local\Microsoft\Windows\INetCache\dune\db
+# Workspace root:
+# "D:\\\229\140\151\231\167\145\229\164\167\\114-1\231\183\168\232\173\175\229\153\168\229\142\159\231\144\134\\CompilerHW\\HW2\\mini-python"
+# Auto-detected concurrency: 16
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -13,4 +15,10 @@
 #  ; build_dir = In_build_dir "default"
 #  ; instrument_with = []
 #  }
-$ /usr/bin/ocamlc.opt -config > /tmp/dune_61e3e1_output
+$ C:\Users\ianch\AppData\Local\opam\default\bin\ocamlc.opt.exe -config > C:\Users\ianch\AppData\Local\Temp\dune_e3ca97_output
+$ (cd _build/default && C:\Users\ianch\AppData\Local\opam\default\bin\ocamlopt.opt.exe -g -o minipython.exe .minipython.eobjs/native/ast.cmx .minipython.eobjs/native/interp.cmx .minipython.eobjs/native/parser.cmx .minipython.eobjs/native/lexer.cmx .minipython.eobjs/native/minipython.cmx)
+> cygpath: error converting "/usr/lib/gcc/x86_64-w64-mingw32/13/../../../../x86_64-w64-mingw32/lib/x86_64-w64-mingw32/13/" - No such file or directory
+> ** Fatal error: Cannot find file "-lws2_32"
+> File "caml_startup", line 1:
+> Error: Error during linking (exit code 2)
+[2]
