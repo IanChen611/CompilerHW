@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ocaml:*)",
+      "Bash(wsl bash -c \"sudo apt install -y graphviz 2>&1 | head -20\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
