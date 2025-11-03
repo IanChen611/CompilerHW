@@ -1,0 +1,23 @@
+
+// start with a file containing only comments
+
+// then complete this file as the tests progress
+
+// 測試註解
+(* 測試註解 *)
+
+// 彩色正方形
+def square(size) {
+    repeat 4 {
+        forward size
+        turnleft 90
+    }
+}
+
+pendown
+square(50)
+penup
+forward 120
+pendown
+square(80)
+penup

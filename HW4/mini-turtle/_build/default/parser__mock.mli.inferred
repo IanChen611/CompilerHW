@@ -1,0 +1,39 @@
+type token =
+    WHITE
+  | TURNRIGHT
+  | TURNLEFT
+  | TIMES
+  | RPAR
+  | REPEAT
+  | RED
+  | RBRACE
+  | PLUS
+  | PENUP
+  | PENDOWN
+  | MINUS
+  | LPAR
+  | LBRACE
+  | INT of int
+  | IF
+  | IDENT of string
+  | GREEN
+  | FORWARD
+  | EOF
+  | ELSE
+  | DIV
+  | DEF
+  | COMMA
+  | COLOR
+  | BLUE
+  | BLACK
+val menhir_begin_marker : int
+val xv_stmt_list : Ast.stmt list
+val xv_stmt : Ast.stmt
+val xv_prog : Ast.program
+val xv_formal_list : string list
+val xv_expr_list : Ast.expr list
+val xv_expr : Ast.expr
+val xv_def_list : Ast.def list
+val xv_def : Ast.def
+val xv_color : Turtle.color
+val menhir_end_marker : int

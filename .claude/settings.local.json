@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(ocaml:*)",
-      "Bash(wsl bash -c \"sudo apt install -y graphviz 2>&1 | head -20\")"
+      "Bash(wsl bash -c \"sudo apt install -y graphviz 2>&1 | head -20\")",
+      "Bash(dune build:*)",
+      "Bash(cmd /c \"dune build miniturtle.exe\")",
+      "Bash(powershell -Command \"cd 'd:\\北科大\\114-1編譯器原理\\CompilerHW\\HW4\\mini-turtle'; dune build miniturtle.exe 2>&1\":*)",
+      "Bash(powershell -Command \"cd ''d:\\北科大\\114-1編譯器原理\\CompilerHW\\HW4\\mini-turtle''; dune build miniturtle.exe 2>&1 | Select-Object -Last 30\")",
+      "Bash(wsl bash -c \"opam list | grep -E ''dune|menhir|graphics''\")",
+      "Bash(wsl bash -c \"opam install -y dune menhir graphics 2>&1 | head -50\")",
+      "Bash(wsl bash -c \"sudo apt-get update && sudo apt-get install -y libx11-dev libxft-dev pkg-config 2>&1 | tail -20\")"
     ],
     "deny": [],
     "ask": []
