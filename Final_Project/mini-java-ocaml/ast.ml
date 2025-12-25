@@ -96,6 +96,7 @@ and attribute = {
   attr_name : string;
   attr_type : typ;
   mutable attr_ofs : int; (** position within the object *)
+  mutable attr_decl_order : int; (** declaration order for deterministic field layout *)
 }
   (** All the occurrences of the same attribute
       point to a single record of the following type. *)

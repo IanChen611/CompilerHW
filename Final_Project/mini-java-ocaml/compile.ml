@@ -53,12 +53,17 @@ let compute_attribute_offsets c =
   let rec add_attrs parent =
     if parent.class_name <> "Object" then
       add_attrs parent.class_extends;
-    Hashtbl.iter (fun name attr ->
+    (* Convert hashtbl to list and sort by declaration order *)
+    let attrs = Hashtbl.fold (fun name attr acc -> (name, attr) :: acc) parent.class_attributes [] in
+    let sorted_attrs = List.sort (fun (_, a1) (_, a2) -> compare a1.attr_decl_order a2.attr_decl_order) attrs in
+    List.iter (fun (name, attr) ->
       if attr.attr_ofs = 0 then begin
         attr.attr_ofs <- !ofs;
-        ofs := !ofs + 8
-      end
-    ) parent.class_attributes
+      end;
+      (* Update ofs to be after this attribute, even if already set *)
+      if attr.attr_ofs + 8 > !ofs then
+        ofs := attr.attr_ofs + 8
+    ) sorted_attrs
   in
   add_attrs c;
   !ofs
@@ -66,17 +71,56 @@ let compute_attribute_offsets c =
 (* Calculate method offsets *)
 let compute_method_offsets c =
   let ofs = ref 8 in  (* Skip parent descriptor pointer *)
-  let rec add_meths parent =
-    if parent.class_name <> "Object" then
-      add_meths parent.class_extends;
-    Hashtbl.iter (fun name meth ->
+
+  (* First, collect parent method offsets to handle overriding *)
+  let parent_method_offsets = Hashtbl.create 16 in
+  let rec collect_parent_offsets parent =
+    if parent.class_name <> "Object" then begin
+      collect_parent_offsets parent.class_extends;
+      (* Convert to list and sort for deterministic ordering *)
+      let parent_meths = Hashtbl.fold (fun name meth acc -> (name, meth) :: acc) parent.class_methods [] in
+      let sorted_parent_meths = List.sort (fun (n1, _) (n2, _) -> String.compare n1 n2) parent_meths in
+      List.iter (fun (name, meth) ->
+        (* Ensure parent method has offset *)
+        if meth.meth_ofs = 0 then begin
+          meth.meth_ofs <- !ofs;
+          ofs := !ofs + 8
+        end;
+        (* Record offset for this method name *)
+        if not (Hashtbl.mem parent_method_offsets name) then
+          Hashtbl.add parent_method_offsets name meth.meth_ofs;
+        (* Update max offset *)
+        if meth.meth_ofs + 8 > !ofs then
+          ofs := meth.meth_ofs + 8
+      ) sorted_parent_meths
+    end
+  in
+
+  if c.class_name <> "Object" then
+    collect_parent_offsets c.class_extends;
+
+  (* Process current class methods *)
+  let meths = Hashtbl.fold (fun name meth acc -> (name, meth) :: acc) c.class_methods [] in
+  let sorted_meths = List.sort (fun (n1, _) (n2, _) -> String.compare n1 n2) meths in
+  List.iter (fun (name, meth) ->
+    (* Check if this method overrides a parent method *)
+    try
+      let parent_offset = Hashtbl.find parent_method_offsets name in
+      (* Always use parent offset for overriding methods *)
+      meth.meth_ofs <- parent_offset;
+      if parent_offset + 8 > !ofs then
+        ofs := parent_offset + 8
+    with Not_found ->
+      (* New method, assign offset if not already set *)
       if meth.meth_ofs = 0 then begin
         meth.meth_ofs <- !ofs;
         ofs := !ofs + 8
+      end else begin
+        if meth.meth_ofs + 8 > !ofs then
+          ofs := meth.meth_ofs + 8
       end
-    ) parent.class_methods
-  in
-  add_meths c;
+  ) sorted_meths;
+
   !ofs
 
 (* Compile an expression *)
@@ -274,37 +318,46 @@ let rec compile_expr env e =
       pushq (reg rdi) ++
       (* Get method from vtable *)
       movq (ind ~ofs:0 rdi) (reg rbx) ++
-      movq (ind ~ofs:meth.meth_ofs rbx) (reg rbx) ++
+      (* Use offset 8 for predefined methods (String.equals) if offset is 0 *)
+      let method_offset = if meth.meth_ofs = 0 then 8 else meth.meth_ofs in
+      movq (ind ~ofs:method_offset rbx) (reg rbx) ++
       call_star (reg rbx) ++
       (* Clean up stack *)
       addq (imm ((List.length args + 1) * 8)) (reg rsp) ++
       popq rbx
 
   | Ecast (c, e1) ->
+      let lok_null = new_label () in
       let lok = new_label () in
       let lcheck = new_label () in
+      let lfail = new_label () in
       compile_expr env e1 ++
       (* Check for null *)
       testq (reg rax) (reg rax) ++
-      jz lok ++
+      jz lok_null ++  (* Jump to separate label for null case *)
       (* Check class *)
       pushq (reg rax) ++
       movq (ind rax) (reg rbx) ++
       leaq (lab ("class_" ^ c.class_name)) rcx ++
       label lcheck ++
+      (* Check if reached end of class hierarchy (null) *)
+      testq (reg rbx) (reg rbx) ++
+      jz lfail ++
+      (* Compare current class with target class *)
       cmpq (reg rcx) (reg rbx) ++
       je lok ++
+      (* Move to parent class *)
       movq (ind rbx) (reg rbx) ++
-      leaq (lab "class_Object") rcx ++
-      cmpq (reg rcx) (reg rbx) ++
-      jne lcheck ++
+      jmp lcheck ++
+      label lfail ++
       (* Cast failed *)
       leaq (lab "cast_error") rdi ++
       call "my_puts" ++
       movq (imm 1) (reg rdi) ++
       call "exit" ++
       label lok ++
-      popq rax
+      popq rax ++
+      label lok_null  (* Null value ends up here without popping *)
 
   | Einstanceof (e1, classname) ->
       let ltrue = new_label () in
@@ -319,12 +372,15 @@ let rec compile_expr env e =
       movq (ind rax) (reg rbx) ++
       leaq (lab ("class_" ^ classname)) rcx ++
       label lcheck ++
+      (* Check if reached end of class hierarchy (null) *)
+      testq (reg rbx) (reg rbx) ++
+      jz lfalse ++
+      (* Compare current class with target class *)
       cmpq (reg rcx) (reg rbx) ++
       je ltrue ++
+      (* Move to parent class *)
       movq (ind rbx) (reg rbx) ++
-      leaq (lab "class_Object") rcx ++
-      cmpq (reg rcx) (reg rbx) ++
-      jne lcheck ++
+      jmp lcheck ++
       label lfalse ++
       xorq (reg rax) (reg rax) ++
       jmp lend ++
@@ -397,7 +453,8 @@ let compile_method class_name method_name is_constructor params body =
   let env = create_compile_env () in
 
   (* Set up parameter offsets (they are on the stack) *)
-  let param_ofs = ref 16 in  (* Skip return address and saved %rbp *)
+  (* 'this' is at 16(%rbp), explicit parameters start at 24(%rbp) *)
+  let param_ofs = ref 24 in  (* Skip return address, saved %rbp, and implicit 'this' *)
   List.iter (fun v ->
     v.var_ofs <- !param_ofs;
     Hashtbl.add env.local_vars v.var_name !param_ofs;
@@ -426,6 +483,36 @@ let compile_method class_name method_name is_constructor params body =
 (* Compile class descriptor *)
 let compile_class_descriptor c =
   let desc_name = "class_" ^ c.class_name in
+
+  (* Recursively collect all methods from class hierarchy *)
+  let rec collect_methods cls =
+    let parent_methods =
+      if cls.class_name = "Object" then []
+      else collect_methods cls.class_extends
+    in
+
+    (* Add/override methods from current class *)
+    let current_methods = Hashtbl.fold (fun name meth acc ->
+      (name, meth, cls.class_name) :: acc
+    ) cls.class_methods [] in
+
+    (* Merge: current class methods override parent methods *)
+    let merged = List.fold_left (fun acc (name, meth, cls_name) ->
+      (* Remove any existing method with this name from acc *)
+      let acc' = List.filter (fun (n, _, _) -> n <> name) acc in
+      (* Add this method *)
+      (name, meth, cls_name) :: acc'
+    ) parent_methods current_methods in
+
+    merged
+  in
+
+  let all_methods = collect_methods c in
+  (* Sort by offset *)
+  let sorted_methods = List.sort (fun (_, m1, _) (_, m2, _) ->
+    compare m1.meth_ofs m2.meth_ofs
+  ) all_methods in
+
   label desc_name ++
   (* Parent descriptor *)
   (if c.class_name = "Object" then
@@ -433,9 +520,9 @@ let compile_class_descriptor c =
   else
     inline (sprintf "\t.quad class_%s\n" c.class_extends.class_name)) ++
   (* Method table *)
-  Hashtbl.fold (fun name meth code ->
-    code ++ inline (sprintf "\t.quad %s_%s\n" c.class_name name)
-  ) c.class_methods nop
+  List.fold_left (fun code (name, _, cls_name) ->
+    code ++ inline (sprintf "\t.quad %s_%s\n" cls_name name)
+  ) nop sorted_methods
 
 (* Generate library wrappers *)
 let generate_wrappers () =
@@ -486,9 +573,11 @@ let generate_wrappers () =
   pushq (reg rdi) ++
   pushq (reg rsi) ++
   (* Calculate total length *)
+  leaq (ind ~ofs:8 rdi) rdi ++
   call "strlen" ++
   movq (reg rax) (reg r12) ++
-  movq (ind ~ofs:(-8) rbp) (reg rdi) ++
+  movq (ind ~ofs:(-16) rbp) (reg rdi) ++
+  leaq (ind ~ofs:8 rdi) rdi ++
   call "strlen" ++
   addq (reg r12) (reg rax) ++
   addq (imm 9) (reg rax) ++
@@ -499,7 +588,7 @@ let generate_wrappers () =
   leaq (lab "class_String") r12 ++
   movq (reg r12) (ind rax) ++
   leaq (ind ~ofs:8 rax) rdi ++
-  movq (ind ~ofs:(-16) rbp) (reg rsi) ++
+  movq (ind ~ofs:(-8) rbp) (reg rsi) ++
   leaq (ind ~ofs:8 rsi) rsi ++
   call "strcpy" ++
   leaq (ind ~ofs:8 r13) rdi ++
@@ -507,7 +596,7 @@ let generate_wrappers () =
   addq (reg r13) (reg rax) ++
   addq (imm 8) (reg rax) ++
   movq (reg rax) (reg rdi) ++
-  movq (ind ~ofs:(-8) rbp) (reg rsi) ++
+  movq (ind ~ofs:(-16) rbp) (reg rsi) ++
   leaq (ind ~ofs:8 rsi) rsi ++
   call "strcat" ++
   movq (reg r13) (reg rax) ++
@@ -518,6 +607,17 @@ let generate_wrappers () =
 (* Main compilation function *)
 let file ?debug:(b=false) (p: Ast.tfile) : X86_64.program =
   debug := b;
+
+  (* Set up predefined String.equals method offset *)
+  (* String is predefined and needs manual offset setup *)
+  List.iter (fun (c, _) ->
+    if c.class_name = "String" then begin
+      try
+        let equals_method = Hashtbl.find c.class_methods "equals" in
+        equals_method.meth_ofs <- 8
+      with Not_found -> ()
+    end
+  ) p;
 
   (* Compute offsets *)
   List.iter (fun (c, _) ->

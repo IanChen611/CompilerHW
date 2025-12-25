@@ -467,21 +467,26 @@ let declare_members env pfile =
     env.current_class := c;
 
     (* Copy inherited attributes *)
+    let max_parent_decl_order = ref (-1) in
     if c.class_name <> "Object" && c.class_extends.class_name <> "Object" then begin
       Hashtbl.iter (fun name attr ->
-        Hashtbl.add c.class_attributes name attr
+        Hashtbl.add c.class_attributes name attr;
+        if attr.attr_decl_order > !max_parent_decl_order then
+          max_parent_decl_order := attr.attr_decl_order
       ) c.class_extends.class_attributes
     end;
 
     (* Process declarations *)
     let has_constructor = ref false in
     let defined_methods = Hashtbl.create 16 in  (* Track methods defined in THIS class *)
+    let decl_order = ref (!max_parent_decl_order + 1) in  (* Track declaration order for attributes, starting after parent attributes *)
     List.iter (function
       | PDattribute (pt, attr_id) ->
           if Hashtbl.mem c.class_attributes attr_id.id then
             error ~loc:attr_id.loc "attribute %s already declared" attr_id.id;
           let t = ptype_to_type env pt attr_id.loc in
-          let a = { attr_name = attr_id.id; attr_type = t; attr_ofs = 0 } in
+          let a = { attr_name = attr_id.id; attr_type = t; attr_ofs = 0; attr_decl_order = !decl_order } in
+          incr decl_order;
           Hashtbl.add c.class_attributes attr_id.id a
       | PDmethod (ret_opt, meth_id, params, _) ->
           let ret = match ret_opt with
